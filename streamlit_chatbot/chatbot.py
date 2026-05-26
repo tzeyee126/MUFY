@@ -71,6 +71,22 @@ price_range = st.sidebar.slider(
     )
 
 
+import streamlit as st
+import pandas as pd
+import random
+
+# Page configuration
+st.set_page_config(
+    page_title="Student Dashboard",
+    page_icon="📊",
+    layout="centered"
+)
+
+import streamlit as st
+import pandas as pd
+import os
+
+# Page title
 st.title("📚 Study Buddy Matcher")
 
 st.write("""
@@ -78,28 +94,58 @@ Find study partners from the same subject,
 discuss assignments, and prepare for exams together.
 """)
 
+# Create CSV file if it doesn't exist
+if not os.path.exists("students.csv"):
+    df = pd.DataFrame(columns=[
+        "name",
+        "subject",
+        "goal"
+    ])
+    df.to_csv("students.csv", index=False)
+
+# User input
 name = st.text_input("Enter your name")
+
 subject = st.selectbox(
     "Choose your subject",
-    ["Math", "Physics", "Chemistry", "Biology"]
+    [
+        "Math",
+        "Physics",
+        "Chemistry",
+        "Biology",
+        "Computer Science"
+    ]
 )
 
 goal = st.text_area("What do you need help with?")
 
-study_time = st.selectbox(
-    "Preferred Study Time",
-    ["Morning", "Afternoon", "Night"])
-
+# Button
 if st.button("Find Study Group"):
-    st.success(f"Welcome {name}!")
-    st.write(f"You are looking for help in {subject}")
-    st.write(f"Study Goal: {goal}")
 
-    st.subheader("Suggested Study Group")
-    st.write("Group A - Students studying the same subject")
+    # Save student data
+    new_student = pd.DataFrame({
+        "name": [name],
+        "subject": [subject],
+        "goal": [goal]
+    })
 
-st.subheader("Matched Students")
-if st.button("Find Group"):
+    new_student.to_csv(
+        "students.csv",
+        mode="a",
+        header=False,
+        index=False
+    )
+
+    # Read all students
+    df = pd.read_csv("students.csv")
+
+    # Find matching students
     matches = df[df["subject"] == subject]
 
+    st.success("🎉 Study group found!")
+
+    st.subheader("Students studying the same subject")
+
     st.dataframe(matches)
+
+    
