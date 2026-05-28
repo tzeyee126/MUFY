@@ -1,151 +1,36 @@
 import streamlit as st
-import pandas as pd 
+from google import genai
 
-  # Set page title
-st.title("My First Streamlit App")
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
-  # Add header
-st.header("Welcome to the dashboard")
- 
-  # Add text
-st.write("This is a simple demonstration of Streamlit capabilities")
+st.set_page_config(page_title="StudyBuddy Match", page_icon="📚", layout="wide")
 
-  ## Creating a Simple Streamlit Chatbot
-def initialize_session_state():
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+with open("studybuddy.html", "r", encoding="utf-8") as f:
+    html_src = f.read()
 
-def main():
-    st.title("Simple Chatbot")
-    
-    initialize_session_state()
-
-    # Display chat messages from history
-    for message in st.session_state.messages:
-        with st.chat_message(message["role"]):
-            st.write(message["content"])
-
-    # Chat input
-    if prompt := st.chat_input("What's on your mind?"):
-        # Display user message
-        with st.chat_message("user"):
-            st.write(prompt)
-        
-        # Add user message to history
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        
-        # Add simple bot response
-        response = f"You said: {prompt}"
-        
-        # Display bot message
-        with st.chat_message("assistant"):
-            st.write(response)
-        
-        # Add bot message to history
-        st.session_state.messages.append({"role": "assistant", "content": response})
-
-if __name__ == "__main__":
-    main()
-
-# Sample DataFrame
-df = pd.DataFrame({
-    'Month': ['January', 'February', 'March', 'January'],
-    'Price': [1000, 1500, 2000, 1200]
-})
-
-# Add sidebar
-st.sidebar.header("Filters")
-
-# Add dropdown
-selected_month = st.sidebar.selectbox(
-    "Select Month",
-    options=df['Month'].unique()
+# ── Patch 1: inject the API key so the HTML can call Gemini directly ──
+# Replace the empty key initialisation with the real key from secrets
+html_src = html_src.replace(
+    'let geminiApiKey = localStorage.getItem("gemini_api_key") || "";',
+    f'let geminiApiKey = "{st.secrets["GEMINI_API_KEY"]}";'
 )
 
-# Add slider
-price_range = st.sidebar.slider(
-    "Select Price Range",
-    min_value=0,
-    max_value=3000,
-    value=(0, 3000)
-    )
-
-
-import streamlit as st
-import pandas as pd
-import random
-
-# Page configuration
-st.set_page_config(
-    page_title="Student Dashboard",
-    page_icon="📊",
-    layout="centered"
+# ── Patch 2: upgrade model to gemini-2.5-flash (higher free quota) ──
+html_src = html_src.replace(
+    "gemini-2.0-flash",
+    "gemini-2.5-flash"
 )
 
-import streamlit as st
-import pandas as pd
-import os
-
-# Page title
-st.title("📚 Study Buddy Matcher")
-
-st.write("""
-Find study partners from the same subject,
-discuss assignments, and prepare for exams together.
-""")
-
-# Create CSV file if it doesn't exist
-if not os.path.exists("students.csv"):
-    df = pd.DataFrame(columns=[
-        "name",
-        "subject",
-        "goal"
-    ])
-    df.to_csv("students.csv", index=False)
-
-# User input
-name = st.text_input("Enter your name")
-
-subject = st.selectbox(
-    "Choose your subject",
-    [
-        "Math",
-        "Physics",
-        "Chemistry",
-        "Biology",
-        "Computer Science"
-    ]
+# ── Patch 3: hide the API key banner entirely (key is baked in) ──
+html_src = html_src.replace(
+    "// Show API key banner if key not set\n  const banner=document.getElementById(\"api-key-banner\");\n  banner.classList.toggle(\"visible\", !geminiApiKey);",
+    "document.getElementById(\"api-key-banner\").classList.remove(\"visible\");"
 )
 
-goal = st.text_area("What do you need help with?")
+# ── Patch 4: skip the key-check gate in the send handler ──
+html_src = html_src.replace(
+    '    // Gemini tutor\n    if(!geminiApiKey){\n      document.getElementById("api-key-banner").classList.add("visible");\n      chatInput.value=txt; chatSend.disabled=false; return;\n    }\n    tutorMessages.push({role:"user",text:txt});',
+    '    // Gemini tutor (key injected server-side)\n    tutorMessages.push({role:"user",text:txt});'
+)
 
-# Button
-if st.button("Find Study Group"):
-
-    # Save student data
-    new_student = pd.DataFrame({
-        "name": [name],
-        "subject": [subject],
-        "goal": [goal]
-    })
-
-    new_student.to_csv(
-        "students.csv",
-        mode="a",
-        header=False,
-        index=False
-    )
-
-    # Read all students
-    df = pd.read_csv("students.csv")
-
-    # Find matching students
-    matches = df[df["subject"] == subject]
-
-    st.success("🎉 Study group found!")
-
-    st.subheader("Students studying the same subject")
-
-    st.dataframe(matches)
-
-    
+st.components.v1.html(html_src, height=900, scrolling=True)
